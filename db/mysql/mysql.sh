@@ -43,6 +43,9 @@ read_project_config() {
     print_status "Configuración del proyecto cargada:"
     echo "  📁 Proyecto: $PROJECT_NAME"
     echo "  🌐 Dominio: $DOMAIN_NAME"
+    echo "  🚀 Framework: $FRAMEWORK"
+    echo "  🗄️  Base de datos: $DB_TYPE"
+}
 }
 
 # Función para verificar si MySQL está ejecutándose

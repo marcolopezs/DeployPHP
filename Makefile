@@ -201,6 +201,305 @@ show-configuration-summary: ## Mostrar resumen de configuración
 confirm-and-deploy: ## Confirmar configuración e iniciar despliegue
 	@while true; do \
 		read -p "$(GREEN)¿Proceder con el despliegue? [s/N]: $(NC)" confirm; \
+		case $confirm in \
+			[Ss]|[Ss][Ii]) \
+				echo "$(GREEN)🚀 Iniciando despliegue...$(NC)"; \
+				$(MAKE) start-deployment; \
+				break ;; \
+			[Nn]|[Nn][Oo]|"") \
+				echo "$(YELLOW)⚠️  Despliegue cancelado$(NC)"; \
+				rm -f $(CONFIG_FILE); \
+				exit 0 ;; \
+			*) echo "$(RED)❌ Responde 's' para sí o 'n' para no$(NC)" ;; \
+		esac; \
+	done
+
+start-deployment: ## Iniciar el proceso de despliegue
+	@echo "$(BLUE)🔧 Iniciando configuración del servidor...$(NC)"
+	@$(MAKE) validate-config
+	@$(MAKE) install-system-packages
+	@$(MAKE) setup-database
+	@$(MAKE) configure-php
+	@$(MAKE) configure-nginx
+	@$(MAKE) setup-ssl
+	@$(MAKE) configure-framework
+	@$(MAKE) setup-services
+	@$(MAKE) finalize-deployment
+
+validate-config: ## Validar configuración
+	@if [ ! -f $(CONFIG_FILE) ]; then \
+		echo "$(RED)❌ Error: Archivo de configuración no encontrado$(NC)"; \
+		echo "$(YELLOW)💡 Ejecuta 'make setup' primero$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)✅ Configuración validada$(NC)"
+
+install-system-packages: ## Instalar paquetes del sistema
+	@echo "$(BLUE)📦 Instalando paquetes del sistema...$(NC)"
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	sudo apt update && sudo apt upgrade -y; \
+	sudo apt install -y nginx redis-server supervisor unzip git curl; \
+	\
+	echo "$(BLUE)🐘 Instalando PHP $PHP_VERSION...$(NC)"; \
+	sudo apt install -y php$PHP_VERSION-fpm php$PHP_VERSION-mysql php$PHP_VERSION-redis \
+		php$PHP_VERSION-xml php$PHP_VERSION-zip php$PHP_VERSION-curl php$PHP_VERSION-mbstring \
+		php$PHP_VERSION-gd php$PHP_VERSION-intl php$PHP_VERSION-bcmath php$PHP_VERSION-soap \
+		php$PHP_VERSION-opcache; \
+	\
+	if [ "$USE_NODEJS" = "true" ]; then \
+		echo "$(BLUE)📦 Instalando Node.js $NODEJS_VERSION...$(NC)"; \
+		curl -fsSL https://deb.nodesource.com/setup_$NODEJS_VERSION.x | sudo -E bash -; \
+		sudo apt-get install -y nodejs; \
+	else \
+		echo "$(YELLOW)⏭️  Node.js omitido según configuración$(NC)"; \
+	fi; \
+	\
+	if ! command -v composer &> /dev/null; then \
+		echo "$(BLUE)🎵 Instalando Composer...$(NC)"; \
+		curl -sS https://getcomposer.org/installer | php; \
+		sudo mv composer.phar /usr/local/bin/composer; \
+		sudo chmod +x /usr/local/bin/composer; \
+	fi
+
+setup-database: ## Configurar base de datos
+	@echo "$(BLUE)🗄️  Configurando base de datos...$(NC)"
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	if [ "$DB_TYPE" = "mysql" ]; then \
+		$(MAKE) setup-mysql; \
+	elif [ "$DB_TYPE" = "mariadb" ]; then \
+		$(MAKE) setup-mariadb; \
+	fi
+
+setup-mysql: ## Instalar y configurar MySQL
+	@echo "$(BLUE)🐬 Instalando MySQL...$(NC)"
+	@sudo apt install -y mysql-server mysql-client
+	@sudo systemctl start mysql
+	@sudo systemctl enable mysql
+	@chmod +x db/mysql/mysql.sh
+	@./db/mysql/mysql.sh
+
+setup-mariadb: ## Instalar y configurar MariaDB
+	@echo "$(BLUE)🦭 Instalando MariaDB...$(NC)"
+	@sudo apt install -y mariadb-server mariadb-client
+	@sudo systemctl start mariadb
+	@sudo systemctl enable mariadb
+	@chmod +x db/mariadb/mariadb.sh
+	@./db/mariadb/mariadb.sh
+
+configure-php: ## Configurar PHP-FPM
+	@echo "$(BLUE)🐘 Configurando PHP-FPM...$(NC)"
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	sudo cp frameworks/$FRAMEWORK/php-fpm.conf /etc/php/$PHP_VERSION/fpm/pool.d/$PROJECT_NAME.conf; \
+	sudo sed -i "s/PROJECT_NAME/$PROJECT_NAME/g" /etc/php/$PHP_VERSION/fpm/pool.d/$PROJECT_NAME.conf; \
+	sudo sed -i "s/PHP_VERSION/$PHP_VERSION/g" /etc/php/$PHP_VERSION/fpm/pool.d/$PROJECT_NAME.conf; \
+	sudo systemctl restart php$PHP_VERSION-fpm; \
+	sudo systemctl enable php$PHP_VERSION-fpm
+
+configure-nginx: ## Configurar Nginx
+	@echo "$(BLUE)🌐 Configurando Nginx...$(NC)"
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	$(MAKE) generate-nginx-config; \
+	sudo ln -sf /etc/nginx/sites-available/$PROJECT_NAME /etc/nginx/sites-enabled/; \
+	sudo nginx -t && sudo systemctl restart nginx; \
+	sudo systemctl enable nginx
+
+generate-nginx-config: ## Generar configuración de Nginx
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	if [ "$SSL_TYPE" = "letsencrypt" ]; then \
+		cp frameworks/$FRAMEWORK/nginx-template.conf /tmp/nginx-$PROJECT_NAME.conf; \
+		sed -i "s/LETSENCRYPT_SSL_CONFIG/ssl_certificate \/etc\/letsencrypt\/live\/$DOMAIN_NAME\/fullchain.pem;\n    ssl_certificate_key \/etc\/letsencrypt\/live\/$DOMAIN_NAME\/privkey.pem;/g" /tmp/nginx-$PROJECT_NAME.conf; \
+	else \
+		cp frameworks/$FRAMEWORK/nginx-template.conf /tmp/nginx-$PROJECT_NAME.conf; \
+		sed -i "s/CLOUDFLARE_SSL_CONFIG/ssl_certificate \/etc\/ssl\/certs\/cloudflare-origin.pem;\n    ssl_certificate_key \/etc\/ssl\/private\/cloudflare-origin.key;/g" /tmp/nginx-$PROJECT_NAME.conf; \
+	fi; \
+	sed -i "s/PROJECT_NAME/$PROJECT_NAME/g" /tmp/nginx-$PROJECT_NAME.conf; \
+	sed -i "s/DOMAIN_NAME/$DOMAIN_NAME/g" /tmp/nginx-$PROJECT_NAME.conf; \
+	sed -i "s/PHP_VERSION/$PHP_VERSION/g" /tmp/nginx-$PROJECT_NAME.conf; \
+	sudo mv /tmp/nginx-$PROJECT_NAME.conf /etc/nginx/sites-available/$PROJECT_NAME
+
+setup-ssl: ## Configurar certificados SSL
+	@echo "$(BLUE)🔒 Configurando SSL...$(NC)"
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	if [ "$SSL_TYPE" = "letsencrypt" ]; then \
+		$(MAKE) setup-letsencrypt; \
+	elif [ "$SSL_TYPE" = "cloudflare" ]; then \
+		$(MAKE) setup-cloudflare; \
+	fi
+
+setup-letsencrypt: ## Configurar Let's Encrypt
+	@echo "$(BLUE)🔒 Configurando Let's Encrypt...$(NC)"
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	sudo apt install -y certbot python3-certbot-nginx; \
+	sudo certbot --nginx -d $DOMAIN_NAME -d www.$DOMAIN_NAME --non-interactive --agree-tos --email admin@$DOMAIN_NAME || true
+
+setup-cloudflare: ## Configurar Cloudflare SSL
+	@echo "$(BLUE)☁️  Configurando Cloudflare SSL...$(NC)"
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	echo "$(YELLOW)📋 Para completar la configuración de Cloudflare:$(NC)"; \
+	echo "$(YELLOW)1. Sube tu certificado a: ssl/cloudflare/$DOMAIN_NAME.pem$(NC)"; \
+	echo "$(YELLOW)2. Sube tu clave privada a: ssl/cloudflare/$DOMAIN_NAME.key$(NC)"; \
+	echo "$(YELLOW)3. Ejecuta: make install-cloudflare-certs$(NC)"
+
+install-cloudflare-certs: ## Instalar certificados de Cloudflare
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	if [ -f "ssl/cloudflare/$DOMAIN_NAME.pem" ] && [ -f "ssl/cloudflare/$DOMAIN_NAME.key" ]; then \
+		sudo cp ssl/cloudflare/$DOMAIN_NAME.pem /etc/ssl/certs/cloudflare-origin.pem; \
+		sudo cp ssl/cloudflare/$DOMAIN_NAME.key /etc/ssl/private/cloudflare-origin.key; \
+		sudo chmod 644 /etc/ssl/certs/cloudflare-origin.pem; \
+		sudo chmod 600 /etc/ssl/private/cloudflare-origin.key; \
+		sudo chown root:root /etc/ssl/certs/cloudflare-origin.pem; \
+		sudo chown root:root /etc/ssl/private/cloudflare-origin.key; \
+		sudo openssl dhparam -out /etc/ssl/certs/dhparam.pem 2048; \
+		sudo systemctl restart nginx; \
+		echo "$(GREEN)✅ Certificados de Cloudflare instalados$(NC)"; \
+	else \
+		echo "$(RED)❌ Error: Archivos de certificado no encontrados$(NC)"; \
+		echo "$(YELLOW)Asegúrate de subir los archivos a ssl/cloudflare/$(NC)"; \
+	fi
+
+configure-framework: ## Configurar el framework específico
+	@echo "$(BLUE)🚀 Configurando framework...$(NC)"
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	chmod +x frameworks/$FRAMEWORK/setup.sh; \
+	./frameworks/$FRAMEWORK/setup.sh
+
+setup-services: ## Configurar servicios del sistema
+	@echo "$(BLUE)⚙️  Configurando servicios...$(NC)"
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	if [ "$FRAMEWORK" = "laravel" ]; then \
+		$(MAKE) setup-laravel-services; \
+	fi; \
+	$(MAKE) set-permissions
+
+setup-laravel-services: ## Configurar servicios específicos de Laravel
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	cp services/laravel-worker.conf /tmp/$PROJECT_NAME-worker.conf; \
+	sed -i "s/PROJECT_NAME/$PROJECT_NAME/g" /tmp/$PROJECT_NAME-worker.conf; \
+	sudo mv /tmp/$PROJECT_NAME-worker.conf /etc/supervisor/conf.d/; \
+	sudo supervisorctl reread; \
+	sudo supervisorctl update; \
+	echo "* * * * * cd $(PROJECTS_DIR)/$PROJECT_NAME && php artisan schedule:run >> /dev/null 2>&1" | sudo tee -a /var/spool/cron/crontabs/www-data
+
+set-permissions: ## Establecer permisos correctos
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	sudo chown -R www-data:www-data $(PROJECTS_DIR)/$PROJECT_NAME; \
+	sudo chmod -R 755 $(PROJECTS_DIR)/$PROJECT_NAME; \
+	if [ "$FRAMEWORK" = "laravel" ]; then \
+		sudo chmod -R 775 $(PROJECTS_DIR)/$PROJECT_NAME/storage; \
+		sudo chmod -R 775 $(PROJECTS_DIR)/$PROJECT_NAME/bootstrap/cache; \
+	elif [ "$FRAMEWORK" = "wordpress" ]; then \
+		sudo chmod -R 775 $(PROJECTS_DIR)/$PROJECT_NAME/wp-content; \
+	fi
+
+finalize-deployment: ## Finalizar despliegue
+	@clear
+	@echo "$(GREEN)╔══════════════════════════════════════════════════════════════════════════════╗$(NC)"
+	@echo "$(GREEN)║                        🎉 ¡Despliegue Completado!                          ║$(NC)"
+	@echo "$(GREEN)╚══════════════════════════════════════════════════════════════════════════════╝$(NC)"
+	@echo ""
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	echo "$(CYAN)🌐 Tu aplicación está disponible en: https://$DOMAIN_NAME$(NC)"; \
+	echo "$(CYAN)🚀 Framework: $FRAMEWORK$(NC)"; \
+	echo ""; \
+	echo "$(YELLOW)📋 Próximos pasos:$(NC)"; \
+	echo "$(YELLOW)• Configura tu DNS para apuntar a este servidor$(NC)"; \
+	echo "$(YELLOW)• Revisa los logs: make logs$(NC)"; \
+	echo "$(YELLOW)• Monitorea el estado: make status$(NC)"; \
+	echo ""
+
+deploy: ## Desplegar proyecto ya configurado
+	@if [ ! -f $(CONFIG_FILE) ]; then \
+		echo "$(RED)❌ No hay configuración. Ejecuta 'make setup' primero$(NC)"; \
+		exit 1; \
+	fi
+	@$(MAKE) start-deployment
+
+status: ## Ver estado de todos los servicios
+	@echo "$(GREEN)📊 Estado de Servicios$(NC)"
+	@echo "════════════════════════════════════════════════════════════════════════════════"
+	@if [ -f $(CONFIG_FILE) ]; then \
+		export $(cat $(CONFIG_FILE) | xargs); \
+		echo "$(YELLOW)🌐 Nginx:$(NC)"; \
+		sudo systemctl status nginx --no-pager -l | head -3; \
+		echo ""; \
+		echo "$(YELLOW)🐘 PHP-FPM:$(NC)"; \
+		sudo systemctl status php$PHP_VERSION-fpm --no-pager -l | head -3; \
+		echo ""; \
+		echo "$(YELLOW)🗄️  Base de Datos:$(NC)"; \
+		if [ "$DB_TYPE" = "mysql" ]; then \
+			sudo systemctl status mysql --no-pager -l | head -3; \
+		else \
+			sudo systemctl status mariadb --no-pager -l | head -3; \
+		fi; \
+		echo ""; \
+		echo "$(YELLOW)📦 Redis:$(NC)"; \
+		sudo systemctl status redis-server --no-pager -l | head -3; \
+	else \
+		echo "$(RED)❌ No hay configuración activa$(NC)"; \
+	fi
+
+logs: ## Ver logs de la aplicación
+	@if [ -f $(CONFIG_FILE) ]; then \
+		export $(cat $(CONFIG_FILE) | xargs); \
+		echo "$(GREEN)📋 Logs de $PROJECT_NAME ($FRAMEWORK)$(NC)"; \
+		if [ "$FRAMEWORK" = "laravel" ]; then \
+			tail -f $(PROJECTS_DIR)/$PROJECT_NAME/storage/logs/laravel.log; \
+		elif [ "$FRAMEWORK" = "wordpress" ]; then \
+			tail -f /var/log/nginx/$PROJECT_NAME.error.log; \
+		fi; \
+	else \
+		echo "$(RED)❌ No hay configuración activa$(NC)"; \
+	fi
+
+clean: ## Limpiar archivos de configuración
+	@rm -f $(CONFIG_FILE)
+	@echo "$(GREEN)✅ Configuración limpiada$(NC)"
+
+# Comandos de utilidad
+restart-services: ## Reiniciar todos los servicios
+	@if [ -f $(CONFIG_FILE) ]; then \
+		export $(cat $(CONFIG_FILE) | xargs); \
+		sudo systemctl restart nginx; \
+		sudo systemctl restart php$PHP_VERSION-fpm; \
+		sudo systemctl restart redis-server; \
+		if [ "$DB_TYPE" = "mysql" ]; then \
+			sudo systemctl restart mysql; \
+		else \
+			sudo systemctl restart mariadb; \
+		fi; \
+		if [ "$FRAMEWORK" = "laravel" ]; then \
+			sudo supervisorctl restart all; \
+		fi; \
+		echo "$(GREEN)✅ Servicios reiniciados$(NC)"; \
+	else \
+		echo "$(RED)❌ No hay configuración activa$(NC)"; \
+	fi
+
+update-project: ## Actualizar proyecto
+	@if [ -f $(CONFIG_FILE) ]; then \
+		export $(cat $(CONFIG_FILE) | xargs); \
+		cd $(PROJECTS_DIR)/$PROJECT_NAME; \
+		if [ "$FRAMEWORK" = "laravel" ]; then \
+			php artisan down; \
+			git pull origin main; \
+			composer install --no-dev --optimize-autoloader; \
+			if [ "$USE_NODEJS" = "true" ]; then \
+				npm install && npm run build; \
+			fi; \
+			php artisan migrate --force; \
+			php artisan config:cache; \
+			php artisan route:cache; \
+			php artisan view:cache; \
+			php artisan up; \
+		elif [ "$FRAMEWORK" = "wordpress" ]; then \
+			echo "$(YELLOW)WordPress update not implemented yet$(NC)"; \
+		fi; \
+		echo "$(GREEN)✅ Proyecto actualizado$(NC)"; \
+	else \
+		echo "$(RED)❌ No hay configuración activa$(NC)"; \
+	fi
+	@while true; do \
+		read -p "$(GREEN)¿Proceder con el despliegue? [s/N]: $(NC)" confirm; \
 		case $$confirm in \
 			[Ss]|[Ss][Ii]) \
 				echo "$(GREEN)🚀 Iniciando despliegue...$(NC)"; \
@@ -230,6 +529,273 @@ validate-config: ## Validar configuración
 	@if [ ! -f $(CONFIG_FILE) ]; then \
 		echo "$(RED)❌ Error: Archivo de configuración no encontrado$(NC)"; \
 		echo "$(YELLOW)💡 Ejecuta 'make setup' primero$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)✅ Configuración validada$(NC)"
+
+install-system-packages: ## Instalar paquetes del sistema
+	@echo "$(BLUE)📦 Instalando paquetes del sistema...$(NC)"
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	sudo apt update && sudo apt upgrade -y; \
+	sudo apt install -y nginx redis-server supervisor unzip git curl; \
+	\
+	echo "$(BLUE)🐘 Instalando PHP $PHP_VERSION...$(NC)"; \
+	sudo apt install -y php$PHP_VERSION-fpm php$PHP_VERSION-mysql php$PHP_VERSION-redis \
+		php$PHP_VERSION-xml php$PHP_VERSION-zip php$PHP_VERSION-curl php$PHP_VERSION-mbstring \
+		php$PHP_VERSION-gd php$PHP_VERSION-intl php$PHP_VERSION-bcmath php$PHP_VERSION-soap \
+		php$PHP_VERSION-opcache; \
+	\
+	if [ "$USE_NODEJS" = "true" ]; then \
+		echo "$(BLUE)📦 Instalando Node.js $NODEJS_VERSION...$(NC)"; \
+		curl -fsSL https://deb.nodesource.com/setup_$NODEJS_VERSION.x | sudo -E bash -; \
+		sudo apt-get install -y nodejs; \
+	else \
+		echo "$(YELLOW)⏭️  Node.js omitido según configuración$(NC)"; \
+	fi; \
+	\
+	if ! command -v composer &> /dev/null; then \
+		echo "$(BLUE)🎵 Instalando Composer...$(NC)"; \
+		curl -sS https://getcomposer.org/installer | php; \
+		sudo mv composer.phar /usr/local/bin/composer; \
+		sudo chmod +x /usr/local/bin/composer; \
+	fi
+
+setup-database: ## Configurar base de datos
+	@echo "$(BLUE)🗄️  Configurando base de datos...$(NC)"
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	if [ "$DB_TYPE" = "mysql" ]; then \
+		$(MAKE) setup-mysql; \
+	elif [ "$DB_TYPE" = "mariadb" ]; then \
+		$(MAKE) setup-mariadb; \
+	fi
+
+setup-mysql: ## Instalar y configurar MySQL
+	@echo "$(BLUE)🐬 Instalando MySQL...$(NC)"
+	@sudo apt install -y mysql-server mysql-client
+	@sudo systemctl start mysql
+	@sudo systemctl enable mysql
+	@chmod +x db/mysql/mysql.sh
+	@./db/mysql/mysql.sh
+
+setup-mariadb: ## Instalar y configurar MariaDB
+	@echo "$(BLUE)🦭 Instalando MariaDB...$(NC)"
+	@sudo apt install -y mariadb-server mariadb-client
+	@sudo systemctl start mariadb
+	@sudo systemctl enable mariadb
+	@chmod +x db/mariadb/mariadb.sh
+	@./db/mariadb/mariadb.sh
+
+configure-php: ## Configurar PHP-FPM
+	@echo "$(BLUE)🐘 Configurando PHP-FPM...$(NC)"
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	sudo cp php/$PHP_VERSION/php-fpm.conf /etc/php/$PHP_VERSION/fpm/pool.d/$PROJECT_NAME.conf; \
+	sudo sed -i "s/PROJECT_NAME/$PROJECT_NAME/g" /etc/php/$PHP_VERSION/fpm/pool.d/$PROJECT_NAME.conf; \
+	sudo systemctl restart php$PHP_VERSION-fpm; \
+	sudo systemctl enable php$PHP_VERSION-fpm
+
+configure-nginx: ## Configurar Nginx
+	@echo "$(BLUE)🌐 Configurando Nginx...$(NC)"
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	$(MAKE) generate-nginx-config; \
+	sudo ln -sf /etc/nginx/sites-available/$PROJECT_NAME /etc/nginx/sites-enabled/; \
+	sudo nginx -t && sudo systemctl restart nginx; \
+	sudo systemctl enable nginx
+
+generate-nginx-config: ## Generar configuración de Nginx
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	if [ "$SSL_TYPE" = "letsencrypt" ]; then \
+		cp frameworks/$FRAMEWORK/nginx-template.conf /tmp/nginx-$PROJECT_NAME.conf; \
+		sed -i "s/LETSENCRYPT_SSL_CONFIG/ssl_certificate \/etc\/letsencrypt\/live\/$DOMAIN_NAME\/fullchain.pem;\n    ssl_certificate_key \/etc\/letsencrypt\/live\/$DOMAIN_NAME\/privkey.pem;/g" /tmp/nginx-$PROJECT_NAME.conf; \
+	else \
+		cp frameworks/$FRAMEWORK/nginx-template.conf /tmp/nginx-$PROJECT_NAME.conf; \
+		sed -i "s/CLOUDFLARE_SSL_CONFIG/ssl_certificate \/etc\/ssl\/certs\/cloudflare-origin.pem;\n    ssl_certificate_key \/etc\/ssl\/private\/cloudflare-origin.key;/g" /tmp/nginx-$PROJECT_NAME.conf; \
+	fi; \
+	sed -i "s/PROJECT_NAME/$PROJECT_NAME/g" /tmp/nginx-$PROJECT_NAME.conf; \
+	sed -i "s/DOMAIN_NAME/$DOMAIN_NAME/g" /tmp/nginx-$PROJECT_NAME.conf; \
+	sed -i "s/PHP_VERSION/$PHP_VERSION/g" /tmp/nginx-$PROJECT_NAME.conf; \
+	sudo mv /tmp/nginx-$PROJECT_NAME.conf /etc/nginx/sites-available/$PROJECT_NAME
+
+setup-ssl: ## Configurar certificados SSL
+	@echo "$(BLUE)🔒 Configurando SSL...$(NC)"
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	if [ "$SSL_TYPE" = "letsencrypt" ]; then \
+		$(MAKE) setup-letsencrypt; \
+	elif [ "$SSL_TYPE" = "cloudflare" ]; then \
+		$(MAKE) setup-cloudflare; \
+	fi
+
+setup-letsencrypt: ## Configurar Let's Encrypt
+	@echo "$(BLUE)🔒 Configurando Let's Encrypt...$(NC)"
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	sudo apt install -y certbot python3-certbot-nginx; \
+	sudo certbot --nginx -d $DOMAIN_NAME -d www.$DOMAIN_NAME --non-interactive --agree-tos --email admin@$DOMAIN_NAME || true
+
+setup-cloudflare: ## Configurar Cloudflare SSL
+	@echo "$(BLUE)☁️  Configurando Cloudflare SSL...$(NC)"
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	echo "$(YELLOW)📋 Para completar la configuración de Cloudflare:$(NC)"; \
+	echo "$(YELLOW)1. Sube tu certificado a: ssl/cloudflare/$DOMAIN_NAME.pem$(NC)"; \
+	echo "$(YELLOW)2. Sube tu clave privada a: ssl/cloudflare/$DOMAIN_NAME.key$(NC)"; \
+	echo "$(YELLOW)3. Ejecuta: make install-cloudflare-certs$(NC)"
+
+install-cloudflare-certs: ## Instalar certificados de Cloudflare
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	if [ -f "ssl/cloudflare/$DOMAIN_NAME.pem" ] && [ -f "ssl/cloudflare/$DOMAIN_NAME.key" ]; then \
+		sudo cp ssl/cloudflare/$DOMAIN_NAME.pem /etc/ssl/certs/cloudflare-origin.pem; \
+		sudo cp ssl/cloudflare/$DOMAIN_NAME.key /etc/ssl/private/cloudflare-origin.key; \
+		sudo chmod 644 /etc/ssl/certs/cloudflare-origin.pem; \
+		sudo chmod 600 /etc/ssl/private/cloudflare-origin.key; \
+		sudo chown root:root /etc/ssl/certs/cloudflare-origin.pem; \
+		sudo chown root:root /etc/ssl/private/cloudflare-origin.key; \
+		sudo openssl dhparam -out /etc/ssl/certs/dhparam.pem 2048; \
+		sudo systemctl restart nginx; \
+		echo "$(GREEN)✅ Certificados de Cloudflare instalados$(NC)"; \
+	else \
+		echo "$(RED)❌ Error: Archivos de certificado no encontrados$(NC)"; \
+		echo "$(YELLOW)Asegúrate de subir los archivos a ssl/cloudflare/$(NC)"; \
+	fi
+
+configure-framework: ## Configurar el framework específico
+	@echo "$(BLUE)🚀 Configurando framework...$(NC)"
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	chmod +x frameworks/$FRAMEWORK/setup.sh; \
+	./frameworks/$FRAMEWORK/setup.sh
+
+setup-services: ## Configurar servicios del sistema
+	@echo "$(BLUE)⚙️  Configurando servicios...$(NC)"
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	if [ "$FRAMEWORK" = "laravel" ]; then \
+		$(MAKE) setup-laravel-services; \
+	fi; \
+	$(MAKE) set-permissions
+
+setup-laravel-services: ## Configurar servicios específicos de Laravel
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	cp services/laravel-worker.conf /tmp/$PROJECT_NAME-worker.conf; \
+	sed -i "s/PROJECT_NAME/$PROJECT_NAME/g" /tmp/$PROJECT_NAME-worker.conf; \
+	sudo mv /tmp/$PROJECT_NAME-worker.conf /etc/supervisor/conf.d/; \
+	sudo supervisorctl reread; \
+	sudo supervisorctl update; \
+	echo "* * * * * cd $(PROJECTS_DIR)/$PROJECT_NAME && php artisan schedule:run >> /dev/null 2>&1" | sudo tee -a /var/spool/cron/crontabs/www-data
+
+set-permissions: ## Establecer permisos correctos
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	sudo chown -R www-data:www-data $(PROJECTS_DIR)/$PROJECT_NAME; \
+	sudo chmod -R 755 $(PROJECTS_DIR)/$PROJECT_NAME; \
+	if [ "$FRAMEWORK" = "laravel" ]; then \
+		sudo chmod -R 775 $(PROJECTS_DIR)/$PROJECT_NAME/storage; \
+		sudo chmod -R 775 $(PROJECTS_DIR)/$PROJECT_NAME/bootstrap/cache; \
+	elif [ "$FRAMEWORK" = "wordpress" ]; then \
+		sudo chmod -R 775 $(PROJECTS_DIR)/$PROJECT_NAME/wp-content; \
+	fi
+
+finalize-deployment: ## Finalizar despliegue
+	@clear
+	@echo "$(GREEN)╔══════════════════════════════════════════════════════════════════════════════╗$(NC)"
+	@echo "$(GREEN)║                        🎉 ¡Despliegue Completado!                          ║$(NC)"
+	@echo "$(GREEN)╚══════════════════════════════════════════════════════════════════════════════╝$(NC)"
+	@echo ""
+	@export $(cat $(CONFIG_FILE) | xargs); \
+	echo "$(CYAN)🌐 Tu aplicación está disponible en: https://$DOMAIN_NAME$(NC)"; \
+	echo "$(CYAN)🚀 Framework: $FRAMEWORK$(NC)"; \
+	echo ""; \
+	echo "$(YELLOW)📋 Próximos pasos:$(NC)"; \
+	echo "$(YELLOW)• Configura tu DNS para apuntar a este servidor$(NC)"; \
+	echo "$(YELLOW)• Revisa los logs: make logs$(NC)"; \
+	echo "$(YELLOW)• Monitorea el estado: make status$(NC)"; \
+	echo ""
+
+deploy: ## Desplegar proyecto ya configurado
+	@if [ ! -f $(CONFIG_FILE) ]; then \
+		echo "$(RED)❌ No hay configuración. Ejecuta 'make setup' primero$(NC)"; \
+		exit 1; \
+	fi
+	@$(MAKE) start-deployment
+
+status: ## Ver estado de todos los servicios
+	@echo "$(GREEN)📊 Estado de Servicios$(NC)"
+	@echo "════════════════════════════════════════════════════════════════════════════════"
+	@if [ -f $(CONFIG_FILE) ]; then \
+		export $(cat $(CONFIG_FILE) | xargs); \
+		echo "$(YELLOW)🌐 Nginx:$(NC)"; \
+		sudo systemctl status nginx --no-pager -l | head -3; \
+		echo ""; \
+		echo "$(YELLOW)🐘 PHP-FPM:$(NC)"; \
+		sudo systemctl status php$PHP_VERSION-fpm --no-pager -l | head -3; \
+		echo ""; \
+		echo "$(YELLOW)🗄️  Base de Datos:$(NC)"; \
+		if [ "$DB_TYPE" = "mysql" ]; then \
+			sudo systemctl status mysql --no-pager -l | head -3; \
+		else \
+			sudo systemctl status mariadb --no-pager -l | head -3; \
+		fi; \
+		echo ""; \
+		echo "$(YELLOW)📦 Redis:$(NC)"; \
+		sudo systemctl status redis-server --no-pager -l | head -3; \
+	else \
+		echo "$(RED)❌ No hay configuración activa$(NC)"; \
+	fi
+
+logs: ## Ver logs de la aplicación
+	@if [ -f $(CONFIG_FILE) ]; then \
+		export $(cat $(CONFIG_FILE) | xargs); \
+		echo "$(GREEN)📋 Logs de $PROJECT_NAME ($FRAMEWORK)$(NC)"; \
+		if [ "$FRAMEWORK" = "laravel" ]; then \
+			tail -f $(PROJECTS_DIR)/$PROJECT_NAME/storage/logs/laravel.log; \
+		elif [ "$FRAMEWORK" = "wordpress" ]; then \
+			tail -f /var/log/nginx/$PROJECT_NAME.error.log; \
+		fi; \
+	else \
+		echo "$(RED)❌ No hay configuración activa$(NC)"; \
+	fi
+
+clean: ## Limpiar archivos de configuración
+	@rm -f $(CONFIG_FILE)
+	@echo "$(GREEN)✅ Configuración limpiada$(NC)"
+
+# Comandos de utilidad
+restart-services: ## Reiniciar todos los servicios
+	@if [ -f $(CONFIG_FILE) ]; then \
+		export $(cat $(CONFIG_FILE) | xargs); \
+		sudo systemctl restart nginx; \
+		sudo systemctl restart php$PHP_VERSION-fpm; \
+		sudo systemctl restart redis-server; \
+		if [ "$DB_TYPE" = "mysql" ]; then \
+			sudo systemctl restart mysql; \
+		else \
+			sudo systemctl restart mariadb; \
+		fi; \
+		if [ "$FRAMEWORK" = "laravel" ]; then \
+			sudo supervisorctl restart all; \
+		fi; \
+		echo "$(GREEN)✅ Servicios reiniciados$(NC)"; \
+	else \
+		echo "$(RED)❌ No hay configuración activa$(NC)"; \
+	fi
+
+update-project: ## Actualizar proyecto
+	@if [ -f $(CONFIG_FILE) ]; then \
+		export $(cat $(CONFIG_FILE) | xargs); \
+		cd $(PROJECTS_DIR)/$PROJECT_NAME; \
+		if [ "$FRAMEWORK" = "laravel" ]; then \
+			php artisan down; \
+			git pull origin main; \
+			composer install --no-dev --optimize-autoloader; \
+			if [ "$USE_NODEJS" = "true" ]; then \
+				npm install && npm run build; \
+			fi; \
+			php artisan migrate --force; \
+			php artisan config:cache; \
+			php artisan route:cache; \
+			php artisan view:cache; \
+			php artisan up; \
+		elif [ "$FRAMEWORK" = "wordpress" ]; then \
+			echo "$(YELLOW)WordPress update not implemented yet$(NC)"; \
+		fi; \
+		echo "$(GREEN)✅ Proyecto actualizado$(NC)"; \
+	else \
+		echo "$(RED)❌ No hay configuración activa$(NC)"; \
+	fi Ejecuta 'make setup' primero$(NC)"; \
 		exit 1; \
 	fi
 	@echo "$(GREEN)✅ Configuración validada$(NC)"
@@ -283,12 +849,12 @@ setup-mariadb: ## Instalar y configurar MariaDB
 	@./db/mariadb/mariadb.sh
 
 configure-php: ## Configurar PHP-FPM
-	@echo "$(BLUE)🐘 Configurando PHP-FPM...$(NC)"
-	@export $$(cat $(CONFIG_FILE) | xargs); \
-	sudo cp php/$$PHP_VERSION/php-fpm.conf /etc/php/$$PHP_VERSION/fpm/pool.d/$$PROJECT_NAME.conf; \
-	sudo sed -i "s/PROJECT_NAME/$$PROJECT_NAME/g" /etc/php/$$PHP_VERSION/fpm/pool.d/$$PROJECT_NAME.conf; \
-	sudo systemctl restart php$$PHP_VERSION-fpm; \
-	sudo systemctl enable php$$PHP_VERSION-fpm
+@echo "$(BLUE)🐘 Configurando PHP-FPM...$(NC)"
+@export $$(cat $(CONFIG_FILE) | xargs); \
+sudo cp frameworks/$$FRAMEWORK/php-fpm/$$PHP_VERSION.conf /etc/php/$$PHP_VERSION/fpm/pool.d/$$PROJECT_NAME.conf; \
+sudo sed -i "s/PROJECT_NAME/$$PROJECT_NAME/g" /etc/php/$$PHP_VERSION/fpm/pool.d/$$PROJECT_NAME.conf; \
+sudo systemctl restart php$$PHP_VERSION-fpm; \
+sudo systemctl enable php$$PHP_VERSION-fpm
 
 configure-nginx: ## Configurar Nginx
 	@echo "$(BLUE)🌐 Configurando Nginx...$(NC)"

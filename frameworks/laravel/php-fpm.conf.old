@@ -1,46 +1,62 @@
 [PROJECT_NAME]
 user = www-data
 group = www-data
-listen = /var/run/php/php8.3-fpm-PROJECT_NAME.sock
+listen = /var/run/php/phpPHP_VERSION-fpm-PROJECT_NAME.sock
 listen.owner = www-data
 listen.group = www-data
 listen.mode = 0660
 
+; Configuración de procesos optimizada para Laravel
 pm = dynamic
-pm.max_children = 70
-pm.start_servers = 14
-pm.min_spare_servers = 7
-pm.max_spare_servers = 28
+pm.max_children = 50
+pm.start_servers = 10
+pm.min_spare_servers = 5
+pm.max_spare_servers = 20
 pm.max_requests = 1000
 
+; Configuración de seguridad para Laravel
 php_admin_value[disable_functions] = exec,passthru,shell_exec,system,proc_open,popen,curl_exec,curl_multi_exec,parse_ini_file,show_source
 php_admin_flag[allow_url_fopen] = off
 php_admin_flag[log_errors] = on
 php_admin_value[error_log] = /var/log/php/PROJECT_NAME-error.log
-php_admin_value[memory_limit] = 512M
+
+; Configuración de memoria y límites para Laravel
+php_admin_value[memory_limit] = 256M
 php_admin_value[max_execution_time] = 60
 php_admin_value[upload_max_filesize] = 32M
 php_admin_value[post_max_size] = 36M
 php_admin_value[max_input_vars] = 5000
 
-; Configuración de seguridad
+; Configuración de sesiones optimizada para Laravel
 php_admin_value[session.save_handler] = redis
 php_admin_value[session.save_path] = "tcp://127.0.0.1:6379"
 php_admin_value[session.cookie_secure] = 1
 php_admin_value[session.cookie_httponly] = 1
 php_admin_value[session.cookie_samesite] = "Strict"
+php_admin_value[session.gc_maxlifetime] = 7200
 
-; Configuración de OPcache optimizada para PHP 8.3
+; Configuración de OPcache optimizada para Laravel
 php_admin_value[opcache.enable] = 1
 php_admin_value[opcache.enable_cli] = 0
-php_admin_value[opcache.memory_consumption] = 512
-php_admin_value[opcache.interned_strings_buffer] = 32
-php_admin_value[opcache.max_accelerated_files] = 16000
+php_admin_value[opcache.memory_consumption] = 256
+php_admin_value[opcache.interned_strings_buffer] = 16
+php_admin_value[opcache.max_accelerated_files] = 10000
 php_admin_value[opcache.revalidate_freq] = 0
 php_admin_value[opcache.fast_shutdown] = 1
 php_admin_value[opcache.validate_timestamps] = 0
 php_admin_value[opcache.save_comments] = 1
 php_admin_value[opcache.load_comments] = 1
 php_admin_value[opcache.file_cache] = /tmp/opcache
-php_admin_value[opcache.jit] = tracing
-php_admin_value[opcache.jit_buffer_size] = 100M
+
+; Configuración específica para Laravel Artisan
+php_admin_value[auto_prepend_file] = 
+php_admin_value[auto_append_file] = 
+
+; Configuración de realpath cache para mejor rendimiento
+php_admin_value[realpath_cache_size] = 4096K
+php_admin_value[realpath_cache_ttl] = 7200
+
+; Configuración de timeouts para Laravel
+php_admin_value[default_socket_timeout] = 60
+php_admin_value[mysql.connect_timeout] = 60
+php_admin_value[mysqli.default_socket] = /var/run/mysqld/mysqld.sock
