@@ -9,6 +9,8 @@ setup: ## Configuración interactiva completa del proyecto
 	@echo "$(YELLOW)Este wizard te guiará paso a paso para configurar tu proyecto.$(NC)"
 	@echo ""
 	@echo "$(BLUE)🔧 Configurando permisos automáticamente...$(NC)"
+	@# Asegurar que todos los scripts sean ejecutables desde el inicio
+	@find . -name "*.sh" -type f -exec chmod +x {} \; 2>/dev/null || true
 	@$(MAKE) auto-permissions
 	@echo ""
 	@read -p "$(BOLD)Presiona ENTER para continuar...$(NC)" dummy
@@ -184,6 +186,7 @@ show-configuration-summary: ## Mostrar resumen de configuración
 	@echo "$(GREEN)📋 Resumen de Configuración$(NC)"
 	@echo "════════════════════════════════════════════════════════════════════════════════"
 	@echo ""
+	@chmod +x $(SCRIPTS_DIR)/show-config-summary.sh
 	@$(SCRIPTS_DIR)/show-config-summary.sh
 	@echo ""
 	@echo "════════════════════════════════════════════════════════════════════════════════"

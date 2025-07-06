@@ -31,13 +31,15 @@ setup-auto-permissions: ## 🔧 Configurar permisos automáticamente para TODOS 
 	@$(call show_permissions_header)
 	@echo "$(BLUE)🔧 Configurando permisos automáticamente...$(NC)"
 	@echo ""
+	@# Configurar permisos de forma inmediata sin dependencias
+	@find $(DEPLOYMENT_DIR) -name "*.sh" -type f -exec chmod +x {} \; 2>/dev/null || true
 	@echo "$(YELLOW)📋 Archivos .sh encontrados:$(NC)"
 	@total_scripts=0; \
 	for script in $(SHELL_SCRIPTS); do \
-		if [ -f "$$script" ]; then \
-			relative_path=$$(echo "$$script" | sed "s|$(DEPLOYMENT_DIR)/||" | sed "s|$(DEPLOYMENT_DIR)||" | sed 's|^./||'); \
-			echo "  $(CYAN)• $$relative_path$(NC)"; \
-			total_scripts=$$((total_scripts + 1)); \
+		if [ -f "$script" ]; then \
+			relative_path=$(echo "$script" | sed "s|$(DEPLOYMENT_DIR)/||" | sed "s|$(DEPLOYMENT_DIR)||" | sed 's|^./||'); \
+			echo "  $(CYAN)• $relative_path$(NC)"; \
+			total_scripts=$((total_scripts + 1)); \
 		fi; \
 	done; \
 	echo ""; \
@@ -45,26 +47,26 @@ setup-auto-permissions: ## 🔧 Configurar permisos automáticamente para TODOS 
 	success_count=0; \
 	error_count=0; \
 	for script in $(SHELL_SCRIPTS); do \
-		if [ -f "$$script" ]; then \
-			relative_path=$$(echo "$$script" | sed "s|$(DEPLOYMENT_DIR)/||" | sed "s|$(DEPLOYMENT_DIR)||" | sed 's|^./||'); \
-			if chmod +x "$$script" 2>/dev/null; then \
-				echo "  $(GREEN)✅ $$relative_path$(NC)"; \
-				success_count=$$((success_count + 1)); \
+		if [ -f "$script" ]; then \
+			relative_path=$(echo "$script" | sed "s|$(DEPLOYMENT_DIR)/||" | sed "s|$(DEPLOYMENT_DIR)||" | sed 's|^./||'); \
+			if chmod +x "$script" 2>/dev/null; then \
+				echo "  $(GREEN)✅ $relative_path$(NC)"; \
+				success_count=$((success_count + 1)); \
 			else \
-				echo "  $(RED)❌ $$relative_path$(NC)"; \
-				error_count=$$((error_count + 1)); \
+				echo "  $(RED)❌ $relative_path$(NC)"; \
+				error_count=$((error_count + 1)); \
 			fi; \
 		fi; \
 	done; \
 	echo ""; \
 	echo "$(CYAN)📊 Resumen:$(NC)"; \
-	echo "  $(BLUE)📁 Total de scripts: $$total_scripts$(NC)"; \
-	echo "  $(GREEN)✅ Configurados: $$success_count$(NC)"; \
-	if [ $$error_count -gt 0 ]; then \
-		echo "  $(RED)❌ Errores: $$error_count$(NC)"; \
+	echo "  $(BLUE)📁 Total de scripts: $total_scripts$(NC)"; \
+	echo "  $(GREEN)✅ Configurados: $success_count$(NC)"; \
+	if [ $error_count -gt 0 ]; then \
+		echo "  $(RED)❌ Errores: $error_count$(NC)"; \
 	fi; \
 	echo ""; \
-	if [ $$error_count -eq 0 ]; then \
+	if [ $error_count -eq 0 ]; then \
 		echo "$(GREEN)✅ Todos los permisos configurados correctamente$(NC)"; \
 	else \
 		echo "$(YELLOW)⚠️  Algunos archivos tuvieron problemas de permisos$(NC)"; \
