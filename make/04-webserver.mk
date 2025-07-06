@@ -1,4 +1,4 @@
-# Configuración de servidor web (Nginx + PHP-FPM)
+# Configuración de servidor web (Nginx + PHP-FPM) - SIN RATE LIMITING
 # make/04-webserver.mk
 
 .PHONY: configure-webserver configure-php configure-nginx generate-nginx-config
@@ -19,8 +19,9 @@ configure-php: ## Configurar PHP-FPM
 configure-nginx: ## Configurar Nginx
 	@echo "$(BLUE)🌐 Configurando Nginx...$(NC)"
 	@$(MAKE) generate-nginx-config
+	@$(MAKE) test-nginx-config
 	@sudo ln -sf /etc/nginx/sites-available/$(PROJECT_NAME) /etc/nginx/sites-enabled/
-	@sudo nginx -t && sudo systemctl restart nginx
+	@sudo systemctl restart nginx
 	@sudo systemctl enable nginx
 	@echo "$(GREEN)✅ Nginx configurado correctamente$(NC)"
 
@@ -56,6 +57,7 @@ test-nginx-config: ## Probar configuración de Nginx
 	else \
 		echo "$(RED)❌ Error en configuración de Nginx$(NC)"; \
 		echo "$(YELLOW)💡 Revisa los logs con: sudo nginx -t$(NC)"; \
+		echo "$(YELLOW)💡 Archivo problemático: /etc/nginx/sites-available/$(PROJECT_NAME)$(NC)"; \
 		exit 1; \
 	fi
 
@@ -84,3 +86,9 @@ show-nginx-config: ## Mostrar configuración actual de Nginx
 	else \
 		echo "$(RED)❌ Archivo de configuración no encontrado$(NC)"; \
 	fi
+
+cleanup-nginx-config: ## Limpiar configuraciones antiguas de Nginx
+	@echo "$(BLUE)🧹 Limpiando configuraciones antiguas...$(NC)"
+	@sudo rm -f /etc/nginx/sites-enabled/$(PROJECT_NAME)-temp
+	@sudo rm -f /etc/nginx/sites-available/$(PROJECT_NAME)-temp
+	@echo "$(GREEN)✅ Configuraciones temporales limpiadas$(NC)"
