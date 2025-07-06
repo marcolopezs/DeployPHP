@@ -11,7 +11,7 @@ configure-webserver: ## Configurar servidor web completo
 configure-php: ## Configurar PHP-FPM
 	@echo "$(BLUE)🐘 Configurando PHP-FPM...$(NC)"
 	@sudo cp frameworks/$(FRAMEWORK)/php-fpm/$(PHP_VERSION).conf /etc/php/$(PHP_VERSION)/fpm/pool.d/$(PROJECT_NAME).conf
-	@sudo sed -i "s/PROJECT_NAME/$(PROJECT_NAME)/g" /etc/php/$(PHP_VERSION)/fmp/pool.d/$(PROJECT_NAME).conf
+	@sudo sed -i "s/PROJECT_NAME/$(PROJECT_NAME)/g" /etc/php/$(PHP_VERSION)/fpm/pool.d/$(PROJECT_NAME).conf
 	@sudo systemctl restart php$(PHP_VERSION)-fpm
 	@sudo systemctl enable php$(PHP_VERSION)-fpm
 	@echo "$(GREEN)✅ PHP-FPM configurado correctamente$(NC)"
