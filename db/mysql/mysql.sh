@@ -46,7 +46,6 @@ read_project_config() {
     echo "  🚀 Framework: $FRAMEWORK"
     echo "  🗄️  Base de datos: $DB_TYPE"
 }
-}
 
 # Función para verificar si MySQL está ejecutándose
 check_mysql_status() {
