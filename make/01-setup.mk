@@ -8,6 +8,9 @@ setup: ## Configuración interactiva completa del proyecto
 	@echo "$(GREEN)¡Bienvenido al sistema de despliegue multi-framework!$(NC)"
 	@echo "$(YELLOW)Este wizard te guiará paso a paso para configurar tu proyecto.$(NC)"
 	@echo ""
+	@echo "$(BLUE)🔧 Configurando permisos automáticamente...$(NC)"
+	@$(MAKE) auto-permissions
+	@echo ""
 	@read -p "$(BOLD)Presiona ENTER para continuar...$(NC)" dummy
 	@$(MAKE) get-project-info
 	@$(MAKE) choose-framework

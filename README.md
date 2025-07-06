@@ -7,6 +7,14 @@
 
 > Sistema de despliegue automatizado para múltiples frameworks PHP sin Docker. Soporta Laravel, WordPress y más frameworks. Configuración interactiva, modular y completamente automatizada.
 
+## 🆕 **Novedades en v2.1**
+
+- ✅ **Permisos Automatizados**: Configuración automática de permisos para TODOS los archivos .sh
+- ✅ **Verificación Inteligente**: Sistema de verificación de permisos antes del despliegue
+- ✅ **Gestión Modular**: Comandos de permisos organizados en módulo separado
+- ✅ **Reparación Automática**: Detección y corrección de permisos problemáticos
+- ✅ **Logging Detallado**: Registro de todas las operaciones de permisos
+
 ## 🆕 **Novedades en v2.0**
 
 - ✅ **Soporte Multi-Framework**: Laravel y WordPress
@@ -238,6 +246,52 @@ deployment/
 ```
 
 ## 🔧 Uso
+
+### Comandos de Testing (NUEVO en v2.1)
+
+```bash
+# Test completo del sistema
+make test-complete
+
+# Tests rápidos (solo esenciales)
+make test-quick
+
+# Test individual de componentes
+make test-structure      # Solo estructura
+make test-automation     # Solo automatización
+make test-performance    # Solo performance
+
+# Test local con reporte detallado
+./test-permissions-local.sh --report
+
+# Ver ayuda de testing
+make help-testing
+
+# Limpiar archivos de test
+make test-clean
+```
+
+### Comandos de Permisos (NUEVO en v2.1)
+
+```bash
+# Configurar permisos automáticamente
+make auto-permissions
+
+# Verificar estado de permisos
+make verify-permissions
+
+# Reparar permisos problemáticos
+make fix-permissions
+
+# Ver ayuda de permisos
+make help-permissions
+
+# Ver estadísticas detalladas
+make show-permissions-stats
+
+# Crear backup de permisos
+make backup-permissions
+```
 
 ### Comandos Principales
 

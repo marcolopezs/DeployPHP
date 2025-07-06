@@ -1,3 +1,41 @@
+# Gestión de permisos automatizada
+setup-permissions: ## Configurar permisos de ejecución para todos los scripts
+	@echo "$(BLUE)🔧 Configurando permisos de ejecución...$(NC)"
+	@echo "$(YELLOW)📂 Scripts principales...$(NC)"
+	@find . -maxdepth 1 -name "*.sh" -type f -exec chmod +x {} \; -exec echo "  ✅ {}" \;
+	@echo "$(YELLOW)📁 Scripts de frameworks...$(NC)"
+	@find frameworks -name "*.sh" -type f -exec chmod +x {} \; -exec echo "  ✅ {}" \;
+	@echo "$(YELLOW)📁 Scripts de base de datos...$(NC)"
+	@find db -name "*.sh" -type f -exec chmod +x {} \; -exec echo "  ✅ {}" \;
+	@echo "$(YELLOW)📁 Scripts SSL...$(NC)"
+	@find ssl -name "*.sh" -type f -exec chmod +x {} \; -exec echo "  ✅ {}" \;
+	@echo "$(YELLOW)📁 Scripts auxiliares...$(NC)"
+	@find scripts -name "*.sh" -type f -exec chmod +x {} \; -exec echo "  ✅ {}" \;
+	@echo "$(YELLOW)📁 Configuraciones PHP-FPM...$(NC)"
+	@find frameworks -name "*.conf" -type f -exec chmod 644 {} \; -exec echo "  ✅ {}" \;
+	@echo "$(GREEN)✅ Todos los permisos configurados correctamente$(NC)"
+
+verify-permissions: ## Verificar permisos de todos los scripts
+	@echo "$(BLUE)🔍 Verificando permisos de scripts...$(NC)"
+	@echo "$(YELLOW)📂 Scripts principales:$(NC)"
+	@find . -maxdepth 1 -name "*.sh" -type f -exec ls -la {} \;
+	@echo "$(YELLOW)📁 Scripts críticos:$(NC)"
+	@ls -la scripts/common.sh frameworks/*/setup.sh db/*/mysql.sh 2>/dev/null || echo "  ⚠️  Algunos scripts no encontrados"
+	@echo "$(YELLOW)📊 Resumen de permisos:$(NC)"
+	@echo "  📄 Scripts ejecutables: $(shell find . -name '*.sh' -type f -executable | wc -l)"
+	@echo "  📄 Scripts no ejecutables: $(shell find . -name '*.sh' -type f ! -executable | wc -l)"
+
+fix-permissions: ## Reparar permisos si hay problemas
+	@echo "$(BLUE)🔧 Reparando permisos...$(NC)"
+	@$(MAKE) setup-permissions
+	@echo "$(YELLOW)🔐 Configurando permisos de seguridad...$(NC)"
+	@# Permisos restrictivos para archivos de configuración
+	@find . -name "*.conf" -type f -exec chmod 644 {} \;
+	@find . -name "*.env*" -type f -exec chmod 600 {} \; 2>/dev/null || true
+	@find ssl -name "*.key" -type f -exec chmod 600 {} \; 2>/dev/null || true
+	@find ssl -name "*.pem" -type f -exec chmod 644 {} \; 2>/dev/null || true
+	@echo "$(GREEN)✅ Permisos reparados$(NC)"
+
 # Utilidades y funciones auxiliares
 # make/99-utils.mk
 
@@ -69,6 +107,19 @@ check-ports: ## Verificar puertos abiertos
 check-ssl: ## Verificar certificado SSL
 	@echo "$(BLUE)🔍 Verificando certificado SSL...$(NC)"
 	@echo | openssl s_client -connect $(DOMAIN_NAME):443 -servername $(DOMAIN_NAME) 2>/dev/null | openssl x509 -noout -dates
+
+# Comandos adicionales para SSL
+manage-ssl: ## Gestionar certificados SSL multi-dominio
+	@$(SCRIPTS_DIR)/manage-ssl-certificates.sh
+
+list-ssl: ## Listar todos los certificados SSL
+	@$(SCRIPTS_DIR)/manage-ssl-certificates.sh list
+
+upload-ssl: ## Subir nuevo certificado SSL
+	@$(SCRIPTS_DIR)/manage-ssl-certificates.sh upload
+
+verify-ssl: ## Verificar certificado SSL específico
+	@$(SCRIPTS_DIR)/manage-ssl-certificates.sh verify
 
 # Comandos de limpieza
 clean-logs: ## Limpiar logs antiguos

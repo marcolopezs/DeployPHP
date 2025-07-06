@@ -1,2 +1,36 @@
+# IDE
 .idea/
+.vscode/
+
+# Archivos temporales
+*.tmp
+*.temp
+*.old
+*.backup
+*.bak
+temp_*
+
+# Archivos de configuración locales
+.deployment-config
+.env.local
+
+# Logs
+*.log
+logs/
+
+# Archivos comprimidos
 *.zip
+*.tar.gz
+*.rar
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Certificados SSL temporales
+ssl/cloudflare/*.pem
+ssl/cloudflare/*.key
+ssl/letsencrypt/temp/
+
+# Backups automáticos
+Makefile.backup.*
