@@ -47,8 +47,8 @@ start-deployment: ## Iniciar el proceso de despliegue
 	@$(MAKE) validate-config
 	@$(MAKE) install-system-packages
 	@$(MAKE) setup-database
-	@$(MAKE) configure-webserver
 	@$(MAKE) setup-ssl
+	@$(MAKE) configure-webserver
 	@$(MAKE) configure-framework
 	@$(MAKE) setup-services
 	@$(MAKE) finalize-deployment

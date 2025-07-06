@@ -48,8 +48,7 @@ validate_project_name() {
 }
 
 validate_domain_name() {
-    # Validación mejorada de dominio que acepta subdominios
-    # Acepta: example.com, sub.example.com, etc.
+    # Validación de dominio que acepta subdominios: example.com, sub.example.com.
     if [[ ! "$DOMAIN_NAME" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$ ]]; then
         print_error "Nombre de dominio inválido: $DOMAIN_NAME"
         print_error "Formato válido: example.com, sub.example.com"
