@@ -32,14 +32,54 @@ print_header() {
 
 # Función para leer configuración del proyecto
 read_project_config() {
-    if [ ! -f "../../.deployment-config" ]; then
+    # Buscar archivo de configuración en diferentes ubicaciones
+    local config_files=(
+        ".deployment-config"
+        "../.deployment-config"
+        "../../.deployment-config"
+        "/var/www/DeployPHP/.deployment-config"
+    )
+    
+    local config_file=""
+    for file in "${config_files[@]}"; do
+        if [ -f "$file" ]; then
+            config_file="$file"
+            break
+        fi
+    done
+    
+    if [ -z "$config_file" ]; then
         print_error "Archivo de configuración no encontrado"
+        print_error "El archivo .deployment-config no existe aún"
+        print_error "Esto indica que el setup no se completó correctamente"
+        print_error "Directorio actual: $(pwd)"
+        print_error "Archivos en directorio actual:"
+        ls -la 2>/dev/null || true
+        print_error "Ejecuta primero: make setup para crear la configuración"
+        exit 1
+    fi
+
+    # Verificar que el archivo no esté vacío
+    if [ ! -s "$config_file" ]; then
+        print_error "El archivo de configuración existe pero está vacío: $config_file"
         exit 1
     fi
 
     # Cargar variables del archivo de configuración
-    export $(cat ../../.deployment-config | xargs)
-
+    export $(cat "$config_file" | grep -v '^#' | xargs)
+    
+    print_status "Configuración cargada desde: $config_file"
+    
+    # Verificar que las variables necesarias estén definidas
+    if [ -z "$PROJECT_NAME" ] || [ -z "$DOMAIN_NAME" ] || [ -z "$FRAMEWORK" ] || [ -z "$DB_TYPE" ]; then
+        print_error "Configuración incompleta. Variables faltantes:"
+        [ -z "$PROJECT_NAME" ] && print_error "  - PROJECT_NAME"
+        [ -z "$DOMAIN_NAME" ] && print_error "  - DOMAIN_NAME"
+        [ -z "$FRAMEWORK" ] && print_error "  - FRAMEWORK"
+        [ -z "$DB_TYPE" ] && print_error "  - DB_TYPE"
+        exit 1
+    fi
+    
     print_status "Configuración del proyecto cargada:"
     echo "  📁 Proyecto: $PROJECT_NAME"
     echo "  🌐 Dominio: $DOMAIN_NAME"
