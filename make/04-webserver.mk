@@ -27,14 +27,15 @@ configure-nginx: ## Configurar Nginx
 
 generate-nginx-config: ## Generar configuración de Nginx con SSL específico por dominio
 	@echo "$(BLUE)📝 Generando configuración de Nginx para $(DOMAIN_NAME)...$(NC)"
+	@cp frameworks/$(FRAMEWORK)/nginx-template.conf /tmp/nginx-$(PROJECT_NAME).conf
 	@if [ "$(SSL_TYPE)" = "letsencrypt" ]; then \
-		cp frameworks/$(FRAMEWORK)/nginx-template.conf /tmp/nginx-$(PROJECT_NAME).conf; \
 		sed -i "s/LETSENCRYPT_SSL_CONFIG/ssl_certificate \/etc\/letsencrypt\/live\/$(DOMAIN_NAME)\/fullchain.pem;\n    ssl_certificate_key \/etc\/letsencrypt\/live\/$(DOMAIN_NAME)\/privkey.pem;/g" /tmp/nginx-$(PROJECT_NAME).conf; \
 		sed -i "s/CLOUDFLARE_SSL_CONFIG//g" /tmp/nginx-$(PROJECT_NAME).conf; \
+		sed -i "s/SSL_TRUSTED_CERTIFICATE_CONFIG/ssl_trusted_certificate \/etc\/letsencrypt\/live\/$(DOMAIN_NAME)\/chain.pem;/g" /tmp/nginx-$(PROJECT_NAME).conf; \
 	elif [ "$(SSL_TYPE)" = "cloudflare" ]; then \
-		cp frameworks/$(FRAMEWORK)/nginx-template.conf /tmp/nginx-$(PROJECT_NAME).conf; \
 		sed -i "s/CLOUDFLARE_SSL_CONFIG/ssl_certificate \/etc\/ssl\/certs\/domains\/$(DOMAIN_NAME)\/$(DOMAIN_NAME).pem;\n    ssl_certificate_key \/etc\/ssl\/private\/domains\/$(DOMAIN_NAME)\/$(DOMAIN_NAME).key;/g" /tmp/nginx-$(PROJECT_NAME).conf; \
 		sed -i "s/LETSENCRYPT_SSL_CONFIG//g" /tmp/nginx-$(PROJECT_NAME).conf; \
+		sed -i "s/SSL_TRUSTED_CERTIFICATE_CONFIG//g" /tmp/nginx-$(PROJECT_NAME).conf; \
 	fi
 	@# Reemplazar variables del template
 	@sed -i "s/PROJECT_NAME/$(PROJECT_NAME)/g" /tmp/nginx-$(PROJECT_NAME).conf
