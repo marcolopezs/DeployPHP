@@ -1,4 +1,4 @@
-# 🚀 Multi-Framework Deployment Environment - Comunidad Latina
+# 🚀 Multi-Framework Deployment Environment
 
 [![Versión](https://img.shields.io/badge/versión-2.0-blue.svg)](https://github.com/comunidad-latina/deployment-environment)
 [![Laravel](https://img.shields.io/badge/Laravel-9%2B-red.svg)](https://laravel.com)
@@ -346,10 +346,6 @@ make clean
 
 <div align="center">
 
-**🚀 Hecho con ❤️ por la Comunidad Latina Multi-Framework**
-
-[⭐ Dale una estrella](https://github.com/comunidad-latina/deployment-environment) • [🐛 Reportar Bug](https://github.com/comunidad-latina/deployment-environment/issues) • [💡 Solicitar Framework](https://github.com/comunidad-latina/deployment-environment/discussions)
-
-**v2.0** - Soporte Multi-Framework • **v1.0** - Solo Laravel
+**v2.0** - Soporte Multi-Framework
 
 </div>
