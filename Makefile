@@ -74,16 +74,7 @@ help-maintenance: ## Ayuda para comandos de mantenimiento
 	@echo "$(GREEN)🔧 Comandos de Mantenimiento:$(NC)"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' make/08-maintenance.mk | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
 
-# Comandos de permisos automatizados (delegados a make/00-permissions.mk)
-auto-permissions: ## 🔧 Configurar permisos automáticamente para TODOS los archivos .sh
-	@$(MAKE) setup-auto-permissions
-
-verify-permissions: ## 🔍 Verificar permisos de todos los archivos .sh
-	@$(MAKE) check-all-permissions
-
-fix-permissions: ## 🔧 Reparar permisos problemáticos
-	@$(MAKE) repair-permissions
-
+# Comandos principales delegados a módulos específicos
 permissions: auto-permissions ## 🔒 Alias para auto-permissions
 
 check: ## Verificar estado del sistema y permisos

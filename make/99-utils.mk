@@ -1,5 +1,5 @@
-# Gestión de permisos automatizada
-setup-permissions: ## Configurar permisos de ejecución para todos los scripts
+# Gestión de permisos automatizada (versión legado)
+setup-permissions: ## Configurar permisos de ejecución para todos los scripts (legado)
 	@echo "$(BLUE)🔧 Configurando permisos de ejecución...$(NC)"
 	@echo "$(YELLOW)📂 Scripts principales...$(NC)"
 	@find . -maxdepth 1 -name "*.sh" -type f -exec chmod +x {} \; -exec echo "  ✅ {}" \;
@@ -14,27 +14,6 @@ setup-permissions: ## Configurar permisos de ejecución para todos los scripts
 	@echo "$(YELLOW)📁 Configuraciones PHP-FPM...$(NC)"
 	@find frameworks -name "*.conf" -type f -exec chmod 644 {} \; -exec echo "  ✅ {}" \;
 	@echo "$(GREEN)✅ Todos los permisos configurados correctamente$(NC)"
-
-verify-permissions: ## Verificar permisos de todos los scripts
-	@echo "$(BLUE)🔍 Verificando permisos de scripts...$(NC)"
-	@echo "$(YELLOW)📂 Scripts principales:$(NC)"
-	@find . -maxdepth 1 -name "*.sh" -type f -exec ls -la {} \;
-	@echo "$(YELLOW)📁 Scripts críticos:$(NC)"
-	@ls -la scripts/common.sh frameworks/*/setup.sh db/*/mysql.sh 2>/dev/null || echo "  ⚠️  Algunos scripts no encontrados"
-	@echo "$(YELLOW)📊 Resumen de permisos:$(NC)"
-	@echo "  📄 Scripts ejecutables: $(shell find . -name '*.sh' -type f -executable | wc -l)"
-	@echo "  📄 Scripts no ejecutables: $(shell find . -name '*.sh' -type f ! -executable | wc -l)"
-
-fix-permissions: ## Reparar permisos si hay problemas
-	@echo "$(BLUE)🔧 Reparando permisos...$(NC)"
-	@$(MAKE) setup-permissions
-	@echo "$(YELLOW)🔐 Configurando permisos de seguridad...$(NC)"
-	@# Permisos restrictivos para archivos de configuración
-	@find . -name "*.conf" -type f -exec chmod 644 {} \;
-	@find . -name "*.env*" -type f -exec chmod 600 {} \; 2>/dev/null || true
-	@find ssl -name "*.key" -type f -exec chmod 600 {} \; 2>/dev/null || true
-	@find ssl -name "*.pem" -type f -exec chmod 644 {} \; 2>/dev/null || true
-	@echo "$(GREEN)✅ Permisos reparados$(NC)"
 
 # Utilidades y funciones auxiliares
 # make/99-utils.mk

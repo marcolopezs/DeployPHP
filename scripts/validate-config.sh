@@ -48,9 +48,17 @@ validate_project_name() {
 }
 
 validate_domain_name() {
-    # Validación básica de dominio
-    if [[ ! "$DOMAIN_NAME" =~ ^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$ ]]; then
+    # Validación mejorada de dominio que acepta subdominios
+    # Acepta: example.com, sub.example.com, etc.
+    if [[ ! "$DOMAIN_NAME" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$ ]]; then
         print_error "Nombre de dominio inválido: $DOMAIN_NAME"
+        print_error "Formato válido: example.com, sub.example.com"
+        exit 1
+    fi
+    
+    # Verificar que no sea muy largo
+    if [ ${#DOMAIN_NAME} -gt 253 ]; then
+        print_error "Nombre de dominio demasiado largo: $DOMAIN_NAME (máximo 253 caracteres)"
         exit 1
     fi
     
