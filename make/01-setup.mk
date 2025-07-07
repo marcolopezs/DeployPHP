@@ -19,6 +19,7 @@ setup: ## Configuración interactiva completa del proyecto
 	@$(MAKE) choose-php-version
 	@$(MAKE) choose-nodejs-version
 	@$(MAKE) choose-database
+	@$(MAKE) setup-cache
 	@$(MAKE) choose-ssl-type
 	@$(MAKE) show-configuration-summary
 	@$(MAKE) confirm-and-deploy
@@ -187,6 +188,8 @@ show-configuration-summary: ## Mostrar resumen de configuración
 	@echo "════════════════════════════════════════════════════════════════════════════════"
 	@echo ""
 	@chmod +x $(SCRIPTS_DIR)/show-config-summary.sh
+	@chmod +x scripts/configure-laravel-cache.sh
+	@chmod +x scripts/configure-wordpress-cache.sh
 	@$(SCRIPTS_DIR)/show-config-summary.sh
 	@echo ""
 	@echo "════════════════════════════════════════════════════════════════════════════════"

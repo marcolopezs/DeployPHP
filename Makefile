@@ -15,6 +15,7 @@ include make/05-ssl.mk
 include make/06-frameworks.mk
 include make/07-services.mk
 include make/08-maintenance.mk
+include make/09-cache.mk
 include make/99-utils.mk
 
 .DEFAULT_GOAL := help
@@ -31,6 +32,7 @@ help: ## Mostrar ayuda del sistema
 	@echo "  $(CYAN)make help-deploy$(NC)      - Comandos de despliegue"
 	@echo "  $(CYAN)make help-permissions$(NC) - Comandos de permisos"
 	@echo "  $(CYAN)make help-testing$(NC)     - Comandos de testing"
+	@echo "  $(CYAN)make help-cache$(NC)       - Comandos de cache"
 	@echo "  $(CYAN)make help-maintenance$(NC) - Comandos de mantenimiento"
 	@echo ""
 	@$(call show_footer)

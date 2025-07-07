@@ -23,6 +23,13 @@ main() {
     
     echo -e "${YELLOW}🗄️  Base de datos:${NC} $DB_TYPE"
     
+    if [ -n "$CACHE_TYPE" ]; then
+        echo -e "${YELLOW}💾 Cache:${NC} $CACHE_TYPE"
+        if [ "$CACHE_TYPE" = "redis" ] && [ -n "$REDIS_PASSWORD" ]; then
+            echo -e "${YELLOW}🔐 Redis password:${NC} Configurado"
+        fi
+    fi
+    
     if [ "$FRAMEWORK" = "wordpress" ] && [ -n "$TABLE_PREFIX" ]; then
         echo -e "${YELLOW}🏷️  Sufijo tablas:${NC} $TABLE_PREFIX"
     fi

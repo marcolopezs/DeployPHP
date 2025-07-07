@@ -103,6 +103,27 @@ configure_laravel() {
 
 # Crear archivo .env básico
 create_basic_env() {
+    # Configurar valores de cache según la selección
+    local cache_driver="file"
+    local session_driver="file"
+    local queue_connection="sync"
+    local redis_password="null"
+    
+    if [ "$CACHE_TYPE" = "redis" ]; then
+        cache_driver="redis"
+        session_driver="redis"
+        queue_connection="redis"
+        redis_password="${REDIS_PASSWORD:-null}"
+    elif [ "$CACHE_TYPE" = "memcached" ]; then
+        cache_driver="memcached"
+        session_driver="memcached"
+        queue_connection="database"
+    elif [ "$CACHE_TYPE" = "database" ]; then
+        cache_driver="database"
+        session_driver="database"
+        queue_connection="database"
+    fi
+    
     cat > .env << EOF
 APP_NAME="$PROJECT_NAME"
 APP_ENV=production
@@ -122,16 +143,16 @@ DB_USERNAME=$DB_USER
 DB_PASSWORD=$DB_PASSWORD
 
 BROADCAST_DRIVER=log
-CACHE_DRIVER=redis
+CACHE_DRIVER=$cache_driver
 FILESYSTEM_DISK=local
-QUEUE_CONNECTION=redis
-SESSION_DRIVER=redis
+QUEUE_CONNECTION=$queue_connection
+SESSION_DRIVER=$session_driver
 SESSION_LIFETIME=120
 
 MEMCACHED_HOST=127.0.0.1
 
 REDIS_HOST=127.0.0.1
-REDIS_PASSWORD=null
+REDIS_PASSWORD=$redis_password
 REDIS_PORT=6379
 
 MAIL_MAILER=smtp
@@ -190,10 +211,33 @@ update_app_config() {
     sed -i "s/^APP_DEBUG=.*/APP_DEBUG=false/" .env
     sed -i "s|^APP_URL=.*|APP_URL=https://$DOMAIN_NAME|" .env
 
-    # Configurar Redis para cache y sesiones
-    sed -i "s/^CACHE_DRIVER=.*/CACHE_DRIVER=redis/" .env
-    sed -i "s/^SESSION_DRIVER=.*/SESSION_DRIVER=redis/" .env
-    sed -i "s/^QUEUE_CONNECTION=.*/QUEUE_CONNECTION=redis/" .env
+    # Configurar cache según la selección del usuario
+    if [ "$CACHE_TYPE" = "redis" ]; then
+        sed -i "s/^CACHE_DRIVER=.*/CACHE_DRIVER=redis/" .env
+        sed -i "s/^SESSION_DRIVER=.*/SESSION_DRIVER=redis/" .env
+        sed -i "s/^QUEUE_CONNECTION=.*/QUEUE_CONNECTION=redis/" .env
+        # Configurar password Redis si existe
+        if [ -n "$REDIS_PASSWORD" ]; then
+            sed -i "s/^REDIS_PASSWORD=.*/REDIS_PASSWORD=$REDIS_PASSWORD/" .env
+        fi
+    elif [ "$CACHE_TYPE" = "memcached" ]; then
+        sed -i "s/^CACHE_DRIVER=.*/CACHE_DRIVER=memcached/" .env
+        sed -i "s/^SESSION_DRIVER=.*/SESSION_DRIVER=memcached/" .env
+        sed -i "s/^QUEUE_CONNECTION=.*/QUEUE_CONNECTION=database/" .env
+    elif [ "$CACHE_TYPE" = "database" ]; then
+        sed -i "s/^CACHE_DRIVER=.*/CACHE_DRIVER=database/" .env
+        sed -i "s/^SESSION_DRIVER=.*/SESSION_DRIVER=database/" .env
+        sed -i "s/^QUEUE_CONNECTION=.*/QUEUE_CONNECTION=database/" .env
+    elif [ "$CACHE_TYPE" = "file" ]; then
+        sed -i "s/^CACHE_DRIVER=.*/CACHE_DRIVER=file/" .env
+        sed -i "s/^SESSION_DRIVER=.*/SESSION_DRIVER=file/" .env
+        sed -i "s/^QUEUE_CONNECTION=.*/QUEUE_CONNECTION=database/" .env
+    else
+        # Sin cache - configuración básica
+        sed -i "s/^CACHE_DRIVER=.*/CACHE_DRIVER=array/" .env
+        sed -i "s/^SESSION_DRIVER=.*/SESSION_DRIVER=file/" .env
+        sed -i "s/^QUEUE_CONNECTION=.*/QUEUE_CONNECTION=sync/" .env
+    fi
 
     # Configurar logs
     sed -i "s/^LOG_LEVEL=.*/LOG_LEVEL=error/" .env
