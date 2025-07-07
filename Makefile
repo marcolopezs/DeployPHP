@@ -92,6 +92,14 @@ fix: ## 🔧 Solucionar problemas comunes
 	@chmod +x scripts/fix-common-issues.sh
 	@scripts/fix-common-issues.sh
 
+fix-redis: ## 🔴 Solucionar problemas de Redis específicamente
+	@chmod +x scripts/fix-redis.sh
+	@scripts/fix-redis.sh
+
+emergency-fix: ## 🚑 Solución de emergencia completa
+	@chmod +x scripts/emergency-fix.sh
+	@scripts/emergency-fix.sh
+
 quick-setup: ## Configuración rápida (solo permisos y verificación)
 	@echo "$(BLUE)🚀 Configuración rápida del sistema...$(NC)"
 	@$(MAKE) auto-permissions

@@ -363,7 +363,12 @@ set_laravel_permissions() {
     # Configurar Git safe directory
     if [ -d "$PROJECT_PATH/.git" ]; then
         print_status "Configurando Git safe directory..."
-        sudo -u www-data git config --global --add safe.directory "$PROJECT_PATH"
+        # Crear directorio home para www-data si no existe
+        sudo mkdir -p /var/www
+        sudo chown www-data:www-data /var/www
+        
+        # Configurar safe directory para www-data user
+        sudo -H -u www-data git config --global --add safe.directory "$PROJECT_PATH"
     fi
 
     # Establecer propietario
