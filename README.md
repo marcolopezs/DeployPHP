@@ -151,12 +151,19 @@ El wizard te guiará por:
    - MySQL (recomendado)
    - MariaDB (alternativa open source)
 
-6. **🔐 Configuración de BD**
+6. **💾 Sistema de Cache**
+   - Redis (recomendado - cache, sesiones y colas)
+   - Memcached (solo cache)
+   - Database Cache (sin servicios adicionales)
+   - File Cache (para servidores básicos)
+   - Sin cache (solo desarrollo)
+
+7. **🔐 Configuración de BD**
    - Nombre de base de datos
    - Usuario y contraseña
    - Prefijo de tablas (WordPress)
 
-7. **🔒 Certificado SSL**
+8. **🔒 Certificado SSL**
    - Let's Encrypt (gratis)
    - Cloudflare Full Strict (CDN)
 
@@ -269,6 +276,22 @@ make help-testing
 
 # Limpiar archivos de test
 make test-clean
+```
+
+### Comandos de Cache (NUEVO en v2.1)
+
+```bash
+# Configurar cache (durante setup)
+make setup-cache
+
+# Instalar sistema de cache
+make install-cache-system
+
+# Probar funcionamiento del cache
+make test-cache
+
+# Ver ayuda de comandos de cache
+make help-cache
 ```
 
 ### Comandos de Permisos (NUEVO en v2.1)

@@ -25,8 +25,17 @@ main() {
     
     if [ -n "$CACHE_TYPE" ]; then
         echo -e "${YELLOW}💾 Cache:${NC} $CACHE_TYPE"
-        if [ "$CACHE_TYPE" = "redis" ] && [ -n "$REDIS_PASSWORD" ]; then
-            echo -e "${YELLOW}🔐 Redis password:${NC} Configurado"
+        if [ "$CACHE_TYPE" = "redis" ]; then
+            if [ -n "$REDIS_PASSWORD" ]; then
+                echo -e "${YELLOW}🔐 Redis password:${NC} Configurado"
+            fi
+            if [ -n "$REDIS_MEMORY" ]; then
+                echo -e "${YELLOW}💾 Memoria Redis:${NC} $REDIS_MEMORY"
+            fi
+        elif [ "$CACHE_TYPE" = "memcached" ]; then
+            if [ -n "$MEMCACHED_MEMORY" ]; then
+                echo -e "${YELLOW}💾 Memoria Memcached:${NC} $MEMCACHED_MEMORY"
+            fi
         fi
     fi
     

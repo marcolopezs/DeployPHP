@@ -1,7 +1,7 @@
 # Sistema de Cache
 # make/09-cache.mk
 
-.PHONY: setup-cache configure-redis configure-memcached configure-database-cache configure-file-cache
+.PHONY: setup-cache install-cache-system ask-redis-config ask-memcached-config
 
 setup-cache: ## 🗄️ Configurar sistema de cache
 	@$(call show_header)
@@ -18,19 +18,21 @@ setup-cache: ## 🗄️ Configurar sistema de cache
 	@read -p "Opción [1-5]: " cache_option; \
 	case $$cache_option in \
 		1) echo "CACHE_TYPE=redis" >> $(CONFIG_FILE); \
-		   $(MAKE) configure-redis ;; \
+		   $(MAKE) ask-redis-config ;; \
 		2) echo "CACHE_TYPE=memcached" >> $(CONFIG_FILE); \
-		   $(MAKE) configure-memcached ;; \
+		   $(MAKE) ask-memcached-config ;; \
 		3) echo "CACHE_TYPE=database" >> $(CONFIG_FILE); \
-		   $(MAKE) configure-database-cache ;; \
+		   echo "$(GREEN)✅ Database Cache seleccionado$(NC)" ;; \
 		4) echo "CACHE_TYPE=file" >> $(CONFIG_FILE); \
-		   $(MAKE) configure-file-cache ;; \
+		   echo "$(GREEN)✅ File Cache seleccionado$(NC)" ;; \
 		5) echo "CACHE_TYPE=none" >> $(CONFIG_FILE); \
-		   echo "$(GREEN)✅ Sin cache configurado$(NC)" ;; \
+		   echo "$(GREEN)✅ Sin cache seleccionado$(NC)" ;; \
 		*) echo "$(RED)❌ Opción inválida$(NC)"; exit 1 ;; \
 	esac
+	@echo ""
+	@read -p "$(BOLD)Presiona ENTER para continuar...$(NC)" dummy
 
-configure-redis: ## 🔴 Configurar Redis
+ask-redis-config: ## Solicitar configuración de Redis
 	@echo ""
 	@echo "$(RED)✅ Redis seleccionado$(NC)"
 	@echo ""
@@ -39,42 +41,42 @@ configure-redis: ## 🔴 Configurar Redis
 	redis_memory=$${redis_memory:-512MB}; \
 	echo "REDIS_PASSWORD=$$redis_password" >> $(CONFIG_FILE); \
 	echo "REDIS_MEMORY=$$redis_memory" >> $(CONFIG_FILE); \
-	echo ""; \
-	echo "$(BLUE)⏳ Instalando y configurando Redis...$(NC)"; \
-	$(MAKE) install-redis; \
-	$(MAKE) configure-redis-frameworks; \
-	echo "$(GREEN)✅ Redis configurado exitosamente$(NC)"
+	echo "$(GREEN)✅ Configuración Redis guardada$(NC)"
 
-configure-memcached: ## 🟠 Configurar Memcached
+ask-memcached-config: ## Solicitar configuración de Memcached
 	@echo ""
 	@echo "$(YELLOW)✅ Memcached seleccionado$(NC)"
 	@echo ""
 	@read -p "Memoria asignada [128MB]: " memcached_memory; \
 	memcached_memory=$${memcached_memory:-128MB}; \
 	echo "MEMCACHED_MEMORY=$$memcached_memory" >> $(CONFIG_FILE); \
-	echo ""; \
-	echo "$(BLUE)⏳ Instalando y configurando Memcached...$(NC)"; \
-	$(MAKE) install-memcached; \
-	$(MAKE) configure-memcached-frameworks; \
-	echo "$(GREEN)✅ Memcached configurado exitosamente$(NC)"
+	echo "$(GREEN)✅ Configuración Memcached guardada$(NC)"
 
-configure-database-cache: ## 🟡 Configurar Database Cache
-	@echo ""
-	@echo "$(BLUE)✅ Database Cache seleccionado$(NC)"
-	@echo ""
-	@echo "$(BLUE)⏳ Configurando cache de base de datos...$(NC)"
-	@$(MAKE) configure-database-cache-frameworks
-	@echo "$(GREEN)✅ Database Cache configurado exitosamente$(NC)"
+# ============================================================================
+# INSTALACIÓN DE CACHE (DESPUÉS DEL SUMMARY)
+# ============================================================================
 
-configure-file-cache: ## 🔵 Configurar File Cache
-	@echo ""
-	@echo "$(CYAN)✅ File Cache seleccionado$(NC)"
-	@echo ""
-	@echo "$(BLUE)⏳ Configurando cache de archivos...$(NC)"
-	@$(MAKE) configure-file-cache-frameworks
-	@echo "$(GREEN)✅ File Cache configurado exitosamente$(NC)"
+install-cache-system: ## 📀 Instalar sistema de cache seleccionado
+	@echo "$(BLUE)📀 Instalando sistema de cache...$(NC)"
+	@if [ "$(CACHE_TYPE)" = "redis" ]; then \
+		$(MAKE) install-redis; \
+		$(MAKE) configure-redis-frameworks; \
+	elif [ "$(CACHE_TYPE)" = "memcached" ]; then \
+		$(MAKE) install-memcached; \
+		$(MAKE) configure-memcached-frameworks; \
+	elif [ "$(CACHE_TYPE)" = "database" ]; then \
+		$(MAKE) configure-database-cache-frameworks; \
+	elif [ "$(CACHE_TYPE)" = "file" ]; then \
+		$(MAKE) configure-file-cache-frameworks; \
+	else \
+		echo "$(YELLOW)⚠️  Sin cache - saltando instalación$(NC)"; \
+	fi
+	@echo "$(GREEN)✅ Sistema de cache configurado$(NC)"
 
-# Instalación de Redis
+# ============================================================================
+# INSTALACIÓN DE SERVICIOS
+# ============================================================================
+
 install-redis: ## Instalar Redis Server
 	@echo "$(BLUE)▶ Instalando Redis Server...$(NC)"
 	@sudo apt update -qq
@@ -89,7 +91,6 @@ install-redis: ## Instalar Redis Server
 	@sudo systemctl restart redis-server
 	@echo "$(GREEN)✅ Redis instalado y configurado$(NC)"
 
-# Instalación de Memcached
 install-memcached: ## Instalar Memcached
 	@echo "$(BLUE)▶ Instalando Memcached...$(NC)"
 	@sudo apt update -qq
@@ -100,7 +101,10 @@ install-memcached: ## Instalar Memcached
 	@sudo systemctl restart memcached
 	@echo "$(GREEN)✅ Memcached instalado y configurado$(NC)"
 
-# Configuración para frameworks
+# ============================================================================
+# CONFIGURACIÓN POR FRAMEWORK
+# ============================================================================
+
 configure-redis-frameworks: ## Configurar Redis para frameworks
 	@echo "$(BLUE)▶ Configurando frameworks para Redis...$(NC)"
 	@if [ "$(FRAMEWORK)" = "laravel" ] || [ "$(FRAMEWORK)" = "both" ]; then \
@@ -137,7 +141,10 @@ configure-file-cache-frameworks: ## Configurar File Cache para frameworks
 		$(MAKE) configure-wordpress-file-cache; \
 	fi
 
-# Configuraciones específicas para Laravel
+# ============================================================================
+# CONFIGURACIONES ESPECÍFICAS PARA LARAVEL
+# ============================================================================
+
 configure-laravel-redis: ## Configurar Laravel con Redis
 	@echo "$(BLUE)▶ Configurando Laravel con Redis...$(NC)"
 	@chmod +x scripts/configure-laravel-cache.sh
@@ -158,7 +165,10 @@ configure-laravel-file-cache: ## Configurar Laravel con File Cache
 	@chmod +x scripts/configure-laravel-cache.sh
 	@scripts/configure-laravel-cache.sh file
 
-# Configuraciones específicas para WordPress
+# ============================================================================
+# CONFIGURACIONES ESPECÍFICAS PARA WORDPRESS
+# ============================================================================
+
 configure-wordpress-redis: ## Configurar WordPress con Redis
 	@echo "$(BLUE)▶ Configurando WordPress con Redis...$(NC)"
 	@chmod +x scripts/configure-wordpress-cache.sh
@@ -179,7 +189,10 @@ configure-wordpress-file-cache: ## Configurar WordPress con File Cache
 	@chmod +x scripts/configure-wordpress-cache.sh
 	@scripts/configure-wordpress-cache.sh file
 
-# Comandos de ayuda
+# ============================================================================
+# COMANDOS DE UTILIDAD
+# ============================================================================
+
 test-cache: ## 🧪 Probar funcionamiento del sistema de cache
 	@chmod +x scripts/test-cache.sh
 	@scripts/test-cache.sh
