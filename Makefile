@@ -84,6 +84,14 @@ check: ## Verificar estado del sistema y permisos
 	@$(MAKE) verify-permissions
 	@$(MAKE) show-info
 
+diagnose: ## 🔍 Diagnosticar problemas del sistema
+	@chmod +x scripts/diagnose-issues.sh
+	@scripts/diagnose-issues.sh
+
+fix: ## 🔧 Solucionar problemas comunes
+	@chmod +x scripts/fix-common-issues.sh
+	@scripts/fix-common-issues.sh
+
 quick-setup: ## Configuración rápida (solo permisos y verificación)
 	@echo "$(BLUE)🚀 Configuración rápida del sistema...$(NC)"
 	@$(MAKE) auto-permissions

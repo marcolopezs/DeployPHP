@@ -249,9 +249,20 @@ update_app_config() {
 install_dependencies() {
     print_status "Instalando dependencias de Laravel..."
 
-    # Instalar dependencias de Composer
+    # Cambiar al usuario www-data para ejecutar composer
     if command -v composer &> /dev/null; then
-        composer install --no-dev --optimize-autoloader --no-interaction
+        # Verificar si composer.lock existe y tiene problemas de compatibilidad
+        if [ -f "composer.lock" ]; then
+            print_warning "Detectado composer.lock, verificando compatibilidad..."
+            # Intentar composer install primero
+            if ! sudo -u www-data composer install --no-dev --optimize-autoloader --no-interaction 2>/dev/null; then
+                print_warning "Composer install falló, ejecutando composer update..."
+                sudo -u www-data composer update --no-dev --optimize-autoloader --no-interaction
+            fi
+        else
+            # Si no hay composer.lock, hacer install normal
+            sudo -u www-data composer install --no-dev --optimize-autoloader --no-interaction
+        fi
         print_status "Dependencias de Composer instaladas"
     else
         print_error "Composer no está instalado"
@@ -261,16 +272,16 @@ install_dependencies() {
     # Instalar dependencias de Node.js si está configurado
     if [ "$USE_NODEJS" = "true" ]; then
         if command -v npm &> /dev/null; then
-            npm install
+            sudo -u www-data npm install
             print_status "Dependencias de Node.js instaladas"
             
             # Compilar assets
             if [ -f "package.json" ]; then
                 if grep -q "vite" package.json; then
-                    npm run build
+                    sudo -u www-data npm run build
                     print_status "Assets compilados con Vite"
                 elif grep -q "mix" package.json; then
-                    npm run production
+                    sudo -u www-data npm run production
                     print_status "Assets compilados con Laravel Mix"
                 else
                     print_warning "No se detectó Vite ni Mix, saltando compilación de assets"
@@ -349,6 +360,12 @@ set_laravel_permissions() {
 
     PROJECT_PATH="/var/www/$PROJECT_NAME"
 
+    # Configurar Git safe directory
+    if [ -d "$PROJECT_PATH/.git" ]; then
+        print_status "Configurando Git safe directory..."
+        sudo -u www-data git config --global --add safe.directory "$PROJECT_PATH"
+    fi
+
     # Establecer propietario
     sudo chown -R www-data:www-data "$PROJECT_PATH"
 
@@ -375,8 +392,8 @@ verify_laravel_installation() {
     cd "$PROJECT_PATH"
 
     # Verificar que Laravel puede ejecutarse
-    if php artisan --version &>/dev/null; then
-        LARAVEL_VERSION=$(php artisan --version | head -n1)
+    if sudo -u www-data php artisan --version &>/dev/null; then
+        LARAVEL_VERSION=$(sudo -u www-data php artisan --version | head -n1)
         print_status "✅ Laravel funcionando correctamente: $LARAVEL_VERSION"
     else
         print_error "❌ Laravel no puede ejecutarse correctamente"
@@ -384,14 +401,35 @@ verify_laravel_installation() {
     fi
 
     # Verificar conexión a base de datos
-    if php artisan migrate:status &>/dev/null; then
+    print_status "Verificando conexión a base de datos..."
+    if sudo -u www-data php artisan migrate:status &>/dev/null; then
         print_status "✅ Conexión a base de datos verificada"
     else
         print_warning "⚠️  No se pudo verificar la conexión a la base de datos"
+        print_warning "Verifica la configuración de DB en .env"
     fi
 
     # Verificar configuración de cache
-    if php artisan config:show app.name &>/dev/null; then
+    print_status "Verificando configuración de cache..."
+    if [ "$CACHE_TYPE" = "redis" ]; then
+        # Verificar conexión Redis
+        if redis-cli ping &>/dev/null; then
+            print_status "✅ Redis conectado correctamente"
+        else
+            print_warning "⚠️  Redis no responde"
+            print_warning "Verificando configuración Redis..."
+            # Intentar reiniciar Redis
+            sudo systemctl restart redis-server
+            sleep 2
+            if redis-cli ping &>/dev/null; then
+                print_status "✅ Redis reiniciado y funcionando"
+            else
+                print_error "❌ Redis no puede conectar"
+            fi
+        fi
+    fi
+
+    if sudo -u www-data php artisan config:show app.name &>/dev/null; then
         print_status "✅ Configuración cacheada correctamente"
     else
         print_warning "⚠️  Problema con la configuración cacheada"
